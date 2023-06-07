@@ -1,8 +1,46 @@
 import pygame
+import pygame_menu
 import random
+from time import sleep
+from pygame_menu import themes
+import sqlite3
+
+conn = sqlite3.connect('leaderboard.db')
+cur = conn.cursor()
+cur.execute("""CREATE TABLE IF NOT EXISTS players(
+   username TEXT PRIMARY KEY,
+   points INT);
+""")
+conn.commit()
+pygame.init()
 
 
-pygame.font.init()
+surface = pygame.display.set_mode((800, 700))
+surface.fill((255, 255, 255))
+
+
+def set_difficulty(value):
+    for i in range(value):
+        print(value(0), "-", value(-1))
+
+
+def start_the_game():
+    user = username.get_value()
+    print(user)
+    run = True
+    while run:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+            main(user)
+    pygame.quit()
+
+
+def level_menu():
+    mainmenu._open(level)
+
+
+mainmenu = pygame_menu.Menu('Главное меню', 800, 700, theme=themes.THEME_SOLARIZED)
 
 #Размеры поля и блоков
 s_width = 800
@@ -123,7 +161,7 @@ shapes = [S, Z, I, O, J, L, T]
 shape_colors = [(0, 255, 0), (255, 0, 0), (0, 255, 255), (255, 255, 0), (255, 165, 0), (0, 0, 255), (128, 0, 128)]
 
 
-# индексы от 0 до 1 обозначают форму
+# индексы от 0 до 6 обозначают форму
 
 
 class Blocks(object):
@@ -138,21 +176,9 @@ class Blocks(object):
         self.rotation = 0  # от 0 до 3
 
 
-def create_grid(locked_positions={}): #Создание сетки поля
-    grid = [[(0, 0, 0) for x in range(10)] for x in range(20)]
-
-    for i in range(len(grid)):
-        for j in range(len(grid[i])):
-            if (j, i) in locked_positions:
-                c = locked_positions[(j, i)]
-                grid[i][j] = c
-    return grid
-
-
 def convert_shape_format(shape):
     positions = []
     format = shape.shape[shape.rotation % len(shape.shape)]
-
     for i, line in enumerate(format):
         row = list(line)
         for j, column in enumerate(row):
@@ -161,7 +187,6 @@ def convert_shape_format(shape):
 
     for i, pos in enumerate(positions):
         positions[i] = (pos[0] - 2, pos[1] - 4)
-
     return positions
 
 
@@ -186,9 +211,8 @@ def check_lost(positions): #проверка на поражение
     return False
 
 
-def get_shape():
-    global shapes, shape_colors
-
+def get_shape(shapes, shape_colors):
+    shapes, shape_colors = shapes, shape_colors
     return Blocks(5, 0, random.choice(shapes))
 
 
@@ -250,33 +274,43 @@ def draw_next_shape(shape, surface):
     surface.blit(label, (sx + 10, sy - 30))
 
 
-def draw_window(surface):
-    surface.fill((0, 0, 0))
-    # Вывод названия игры
-    font = pygame.font.SysFont('comicsans', 60)
-    label = font.render('ТЕТРИС', 1, (255, 255, 255))
+def main(user):
 
-    surface.blit(label, (top_left_x + play_width / 2 - (label.get_width() / 2), 30))
+    def create_grid(locked_positions={}):  # Создание сетки поля
+        grid = [[(0, 0, 0) for x in range(10)] for x in range(20)]
 
-    for i in range(len(grid)):
-        for j in range(len(grid[i])):
-            pygame.draw.rect(surface, grid[i][j], (top_left_x + j * 30, top_left_y + i * 30, 30, 30), 0)
+        for i in range(len(grid)):
+            for j in range(len(grid[i])):
+                if (j, i) in locked_positions:
+                    c = locked_positions[(j, i)]
+                    grid[i][j] = c
+        return grid
 
-    draw_grid(surface, 20, 10)
-    pygame.draw.rect(surface, (255, 0, 0), (top_left_x, top_left_y, play_width, play_height), 5)
-    # pygame.display.update()
+    def draw_window(surface):
+        surface.fill((255, 200, 200))
+        # Вывод названия игры
+        font = pygame.font.SysFont('comicsans', 60)
+        label = font.render('ТЕТРИС', 1, (255, 255, 255))
 
+        surface.blit(label, (top_left_x + play_width / 2 - (label.get_width() / 2), 30))
 
-def main():
-    global grid
+        for i in range(len(grid)):
+            for j in range(len(grid[i])):
+                pygame.draw.rect(surface, grid[i][j], (top_left_x + j * 30, top_left_y + i * 30, 30, 30), 0)
+
+        draw_grid(surface, 20, 10)
+        pygame.draw.rect(surface, (255, 0, 0), (top_left_x, top_left_y, play_width, play_height), 5)
+    user = user
+
+    points = 0
 
     locked_positions = {}  # (x,y):(255,0,0)
     grid = create_grid(locked_positions)
 
     change_Blocks = False
     run = True
-    current_Blocks = get_shape()
-    next_Blocks = get_shape()
+    current_Blocks = get_shape(shapes, shape_colors)
+    next_Blocks = get_shape(shapes, shape_colors)
     clock = pygame.time.Clock()
     fall_time = 0
 
@@ -300,6 +334,7 @@ def main():
                 run = False
                 pygame.display.quit()
                 quit()
+
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
@@ -342,7 +377,7 @@ def main():
                 p = (pos[0], pos[1])
                 locked_positions[p] = current_Blocks.color
             current_Blocks = next_Blocks
-            next_Blocks = get_shape()
+            next_Blocks = get_shape(shapes, shape_colors)
             change_Blocks = False
 
             clear_rows(grid, locked_positions)
@@ -353,29 +388,31 @@ def main():
 
         # проверка на проигрыш
         if check_lost(locked_positions):
+            print(points)
             run = False
-
-    draw_text_middle("Вы проигралм", 40, (255, 255, 255), win)
+        else:
+            points += 1
+    surface.fill((0, 0, 0))
+    draw_text_middle(f"Вы проиграли, Ваш счёт: {points}", 40, (255, 0, 0), win)
+    player = (user, points)
+    cur.execute("INSERT INTO players VALUES(?, ?);", player)
+    conn.commit()
     pygame.display.update()
-    pygame.time.delay(2000)
-
-
-def main_menu():
-    run = True
-    while run:
-        win.fill((0, 0, 0))
-        draw_text_middle('Нажмите любую кнопку!', 60, (255, 255, 255), win)
-        pygame.display.update()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                run = False
-
-            if event.type == pygame.KEYDOWN:
-                main()
-    pygame.quit()
+    pygame.time.delay(1000)
+    mainmenu.mainloop(surface)
 
 
 win = pygame.display.set_mode((s_width, s_height))
 pygame.display.set_caption('Tetris')
+username = mainmenu.add.text_input('Никнейм: ', default='Player', maxchar=20)
+mainmenu.add.button('Играть', start_the_game)
+mainmenu.add.button('Таблица лидеров', level_menu)
+mainmenu.add.button('Выйти', pygame_menu.events.EXIT)
+level = pygame_menu.Menu('Таблица лидеров', 600, 400, theme=themes.THEME_BLUE)
+cur.execute("SELECT * FROM players ORDER BY points DESC;")
+all_results = cur.fetchall()
+all_results = ''.join([str((i[0]) + " - " + str(i[1]) + '\n') for i in all_results])
+level.add.label(all_results)
+mainmenu.mainloop(surface)
 
-main_menu()
+
